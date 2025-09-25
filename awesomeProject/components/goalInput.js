@@ -1,41 +1,37 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet } from 'react-native';
 
-export default function GoalInput({ enteredGoalText, onChangeText, onAddGoal }) {
-  return (
-    <View>
-      {/* Header */}
-      <View style={styles.headerContainer}>
-        <Text style={styles.headerText}>🎯 Goal Manager</Text>
-      </View>
+export default function GoalInput(props) {
+  const [enteredGoalText, setEnteredGoalText] = useState("");
 
-      {/* Input Section */}
-      <View style={styles.inputContainer}>
-        <TextInput
-          style={styles.textInput}
-          placeholder="Your Course Goal"
-          value={enteredGoalText}
-          onChangeText={onChangeText}
-          placeholderTextColor="#999"
-        />
-        <TouchableOpacity style={styles.addButton} onPress={onAddGoal}>
-          <Text style={styles.buttonText}>Add Goal</Text>
-        </TouchableOpacity>
-      </View>
+  const goalInputHandler = (enteredText) => {
+    setEnteredGoalText(enteredText);
+  };
+
+  const addGoalHandler = () => {
+    if (enteredGoalText.trim() === "") return;
+    
+    props.onAddGoal(enteredGoalText);
+    setEnteredGoalText("");
+  };
+
+  return (
+    <View style={styles.inputContainer}>
+      <TextInput
+        style={styles.textInput}
+        placeholder="Your Course Goal"
+        value={enteredGoalText}
+        onChangeText={goalInputHandler}
+        placeholderTextColor="#999"
+      />
+      <TouchableOpacity style={styles.addButton} onPress={addGoalHandler}>
+        <Text style={styles.buttonText}>Add Goal</Text>
+      </TouchableOpacity>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  headerContainer: {
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  headerText: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#1f2937',
-  },
   inputContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
