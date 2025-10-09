@@ -1,33 +1,69 @@
-import React, { useState } from 'react';
-import { View, Text, FlatList, StyleSheet } from 'react-native';
-import GoalInput from './components/goalInput';
-import GoalItem from './components/goalItem';
+import React, { useState, useRef } from 'react';
+import {
+  View,
+  Text,
+  TextInput,
+  Pressable,
+  Modal,
+  Animated,
+  Alert,
+} from 'react-native';
+import styles from './styles';
 
 export default function App() {
+  const [enteredGoalText, setEnteredGoalText] = useState('');
   const [courseGoals, setCourseGoals] = useState([]);
+  const [modalVisible, setModalVisible] = useState(false);
+  const [warningVisible, setWarningVisible] = useState(false);
 
-  const addGoalHandler = (enteredGoalText) => {
-    setCourseGoals((currentCourseGoals) => [
-      ...currentCourseGoals, 
-      {
-        text: enteredGoalText,
-        key: Math.random().toString()
-      }
-    ]);
+  // Animated scale reference
+  const scaleAnim = useRef(new Animated.Value(1)).current;
+
+  // Animation handlers
+  const handlePressIn = () => {
+    Animated.spring(scaleAnim, {
+      toValue: 0.95,
+      useNativeDriver: true,
+    }).start();
   };
 
-  const removeGoalHandler = (goalKey) => {
-    setCourseGoals((currentCourseGoals) => 
-      currentCourseGoals.filter(goal => goal.key !== goalKey)
-    );
+  const handlePressOut = () => {
+    Animated.spring(scaleAnim, {
+      toValue: 1,
+      friction: 3,
+      tension: 40,
+      useNativeDriver: true,
+    }).start();
   };
 
-  const renderGoalItem = (itemData) => {
-    return (
-      <GoalItem 
-        text={itemData.item.text}
-        onDeleteItem={() => removeGoalHandler(itemData.item.key)}
-      />
+  function goalInputHandler(text) {
+    setEnteredGoalText(text);
+  }
+
+  function addGoalHandler() {
+    if (!enteredGoalText.trim()) return;
+    setCourseGoals((currentGoals) => {
+      const updated = [...currentGoals, enteredGoalText.trim()];
+      if (updated.length > 5) setWarningVisible(true);
+      return updated;
+    });
+    setEnteredGoalText('');
+    setModalVisible(false);
+  }
+
+  const removeGoalHandler = (indexToRemove) => {
+    setCourseGoals((current) => current.filter((_, i) => i !== indexToRemove));
+  };
+
+  const confirmDeleteHandler = (index, text) => {
+    Alert.alert(
+      'Delete Goal?',
+      `Are you sure you want to delete:\n\n"${text}"`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Delete', style: 'destructive', onPress: () => removeGoalHandler(index) },
+      ],
+      { cancelable: true }
     );
   };
 
@@ -38,21 +74,78 @@ export default function App() {
         <Text style={styles.headerText}>🎯 Goal Manager</Text>
       </View>
 
-      {/* Input Section */}
-      <GoalInput onAddGoal={addGoalHandler} />
+      {/* Open Modal Button (Animated) */}
+      <Pressable
+        onPress={() => setModalVisible(true)}
+        onPressIn={handlePressIn}
+        onPressOut={handlePressOut}
+      >
+        <Animated.View
+          style={[
+            styles.openButton,
+            { transform: [{ scale: scaleAnim }] },
+          ]}
+        >
+          <Text style={styles.buttonText}>Add New Goal</Text>
+        </Animated.View>
+      </Pressable>
 
-      {/* Goals List Section */}
+      {/* Add Goal Modal */}
+      <Modal visible={modalVisible} animationType="slide">
+        <View style={styles.inputContainer}>
+          <TextInput
+            style={styles.textInput}
+            placeholder="Your course goal"
+            onChangeText={goalInputHandler}
+            value={enteredGoalText}
+            placeholderTextColor="#999"
+          />
+
+          <Pressable onPress={addGoalHandler} onPressIn={handlePressIn} onPressOut={handlePressOut}>
+            <Animated.View style={[styles.addButton, { transform: [{ scale: scaleAnim }] }]}>
+              <Text style={styles.buttonText}>Add</Text>
+            </Animated.View>
+          </Pressable>
+
+          <Pressable onPress={() => setModalVisible(false)} onPressIn={handlePressIn} onPressOut={handlePressOut}>
+            <Animated.View style={[styles.cancelButton, { transform: [{ scale: scaleAnim }] }]}>
+              <Text style={styles.buttonText}>Cancel</Text>
+            </Animated.View>
+          </Pressable>
+        </View>
+      </Modal>
+
+      {/* Warning Modal */}
+      <Modal visible={warningVisible} transparent animationType="fade">
+        <View style={styles.warningOverlay}>
+          <View style={styles.warningBox}>
+            <Text style={styles.warningText}>Too many goals! ⚠️</Text>
+            <Text style={styles.warningSubText}>
+              Don’t overwhelm yourself — focus on your top priorities.
+            </Text>
+            <Pressable onPress={() => setWarningVisible(false)} onPressIn={handlePressIn} onPressOut={handlePressOut}>
+              <Animated.View style={[styles.closeWarningButton, { transform: [{ scale: scaleAnim }] }]}>
+                <Text style={styles.buttonText}>Okay</Text>
+              </Animated.View>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Goals List */}
       <View style={styles.goalsContainer}>
         <Text style={styles.goalsTitle}>📝 List of Goals ({courseGoals.length})</Text>
-        
+
         {courseGoals.length === 0 ? (
           <Text style={styles.emptyText}>No goals yet. Add your first goal above! 🚀</Text>
         ) : (
-          <FlatList 
-            data={courseGoals}
-            renderItem={renderGoalItem}
-            style={styles.goalsList}
-          />
+          courseGoals.map((goal, index) => (
+            <Pressable key={`${goal}-${index}`} onPress={() => confirmDeleteHandler(index, goal)}>
+              <Animated.View style={[styles.goalItem, { transform: [{ scale: scaleAnim }] }]}>
+                <Text style={styles.goalItemText}>{goal}</Text>
+              </Animated.View>
+            </Pressable>
+          ))
         )}
 
         {/* Footer */}
@@ -67,52 +160,3 @@ export default function App() {
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  appContainer: {
-    flex: 1,
-    backgroundColor: '#f0f4ff',
-    paddingTop: 50,
-    paddingHorizontal: 16,
-  },
-  headerContainer: {
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  headerText: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#1f2937',
-  },
-  goalsContainer: {
-    flex: 1,
-  },
-  goalsTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#374151',
-    marginBottom: 15,
-  },
-  goalsList: {
-    flex: 1,
-  },
-  emptyText: {
-    textAlign: 'center',
-    color: '#6b7280',
-    fontSize: 16,
-    fontStyle: 'italic',
-    marginTop: 40,
-  },
-  footerContainer: {
-    marginTop: 20,
-    paddingTop: 15,
-    borderTopWidth: 1,
-    borderTopColor: '#e5e7eb',
-    alignItems: 'center',
-  },
-  footerText: {
-    fontSize: 14,
-    color: '#6b7280',
-    textAlign: 'center',
-  },
-});
