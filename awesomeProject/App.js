@@ -1,118 +1,108 @@
-import React, { useState } from 'react';
-import { View, Text, FlatList, StyleSheet } from 'react-native';
-import GoalInput from './components/goalInput';
-import GoalItem from './components/goalItem';
+import React, { useEffect, useState } from "react";
+import {
+  StyleSheet,
+  View,
+  Modal,
+  Image,
+  Pressable,
+  BackHandler,
+  Alert,
+} from "react-native";
+import { Image as RNImage } from "react-native";
+import { SafeAreaProvider, useSafeAreaInsets, SafeAreaView } from "react-native-safe-area-context";
 
-export default function App() {
-  const [courseGoals, setCourseGoals] = useState([]);
+import MessageList from "./components/MessageList";
+import { createTextMessage, createImageMessage } from "./utils/MessageUtils";
 
-  const addGoalHandler = (enteredGoalText) => {
-    setCourseGoals((currentCourseGoals) => [
-      ...currentCourseGoals, 
-      {
-        text: enteredGoalText,
-        key: Math.random().toString()
+const BG = "#eb9e1bff"; // <- soft off-white
+
+function ChatScreen() {
+  const insets = useSafeAreaInsets();
+  const memeUri = RNImage.resolveAssetSource(require("./assets/meme.jpg")).uri;
+
+  const [messages, setMessages] = useState([
+    createTextMessage("Hello"),
+    createTextMessage("World"),
+    createImageMessage(memeUri),
+  ]);
+
+  const [fullscreenUri, setFullscreenUri] = useState(null);
+
+  const onPressMessage = (message) => {
+    if (message.type === "text") {
+      Alert.alert(
+        "Delete message?",
+        `"${message.text}"`,
+        [
+          { text: "Cancel", style: "cancel" },
+          {
+            text: "Delete",
+            style: "destructive",
+            onPress: () =>
+              setMessages((prev) => prev.filter((m) => m.id !== message.id)),
+          },
+        ],
+        { cancelable: true }
+      );
+    } else if (message.type === "image") {
+      setFullscreenUri(message.uri);
+    }
+  };
+
+  useEffect(() => {
+    const onBack = () => {
+      if (fullscreenUri) {
+        setFullscreenUri(null);
+        return true;
       }
-    ]);
-  };
-
-  const removeGoalHandler = (goalKey) => {
-    setCourseGoals((currentCourseGoals) => 
-      currentCourseGoals.filter(goal => goal.key !== goalKey)
-    );
-  };
-
-  const renderGoalItem = (itemData) => {
-    return (
-      <GoalItem 
-        text={itemData.item.text}
-        onDeleteItem={() => removeGoalHandler(itemData.item.key)}
-      />
-    );
-  };
+      return false;
+    };
+    const sub = BackHandler.addEventListener("hardwareBackPress", onBack);
+    return () => sub.remove();
+  }, [fullscreenUri]);
 
   return (
-    <View style={styles.appContainer}>
-      {/* Header */}
-      <View style={styles.headerContainer}>
-        <Text style={styles.headerText}>🎯 Goal Manager</Text>
+    <SafeAreaView style={[styles.safe, { backgroundColor: BG }]} edges={["top", "left", "right"]}>
+      <View style={[styles.container, { paddingTop: insets.top ? 4 : 12 }]}>
+        <MessageList messages={messages} onPressMessage={onPressMessage} />
       </View>
 
-      {/* Input Section */}
-      <GoalInput onAddGoal={addGoalHandler} />
+      <Modal
+        visible={!!fullscreenUri}
+        animationType="fade"
+        transparent
+        onRequestClose={() => setFullscreenUri(null)}
+      >
+        <Pressable style={styles.overlay} onPress={() => setFullscreenUri(null)}>
+          {fullscreenUri && (
+            <Image
+              source={{ uri: fullscreenUri }}
+              style={styles.fullImage}
+              resizeMode="contain"
+            />
+          )}
+        </Pressable>
+      </Modal>
+    </SafeAreaView>
+  );
+}
 
-      {/* Goals List Section */}
-      <View style={styles.goalsContainer}>
-        <Text style={styles.goalsTitle}>📝 List of Goals ({courseGoals.length})</Text>
-        
-        {courseGoals.length === 0 ? (
-          <Text style={styles.emptyText}>No goals yet. Add your first goal above! 🚀</Text>
-        ) : (
-          <FlatList 
-            data={courseGoals}
-            renderItem={renderGoalItem}
-            style={styles.goalsList}
-          />
-        )}
-
-        {/* Footer */}
-        {courseGoals.length > 0 && (
-          <View style={styles.footerContainer}>
-            <Text style={styles.footerText}>
-              Keep going! You've got {courseGoals.length} goal{courseGoals.length !== 1 ? 's' : ''} to achieve! 💪
-            </Text>
-          </View>
-        )}
-      </View>
-    </View>
+export default function App() {
+  return (
+    <SafeAreaProvider>
+      <ChatScreen />
+    </SafeAreaProvider>
   );
 }
 
 const styles = StyleSheet.create({
-  appContainer: {
+  safe: { flex: 1 },
+  container: { flex: 1 },
+  overlay: {
     flex: 1,
-    backgroundColor: '#f0f4ff',
-    paddingTop: 50,
-    paddingHorizontal: 16,
+    backgroundColor: "#e6b562ff",
+    justifyContent: "center",
+    alignItems: "center",
   },
-  headerContainer: {
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  headerText: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#1f2937',
-  },
-  goalsContainer: {
-    flex: 1,
-  },
-  goalsTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#374151',
-    marginBottom: 15,
-  },
-  goalsList: {
-    flex: 1,
-  },
-  emptyText: {
-    textAlign: 'center',
-    color: '#6b7280',
-    fontSize: 16,
-    fontStyle: 'italic',
-    marginTop: 40,
-  },
-  footerContainer: {
-    marginTop: 20,
-    paddingTop: 15,
-    borderTopWidth: 1,
-    borderTopColor: '#e5e7eb',
-    alignItems: 'center',
-  },
-  footerText: {
-    fontSize: 14,
-    color: '#6b7280',
-    textAlign: 'center',
-  },
+  fullImage: { width: "100%", height: "100%" },
 });
