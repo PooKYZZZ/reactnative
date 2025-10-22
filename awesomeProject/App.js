@@ -1,108 +1,150 @@
-import React, { useEffect, useState } from "react";
+// App.js
+import React from 'react';
 import {
   StyleSheet,
   View,
-  Modal,
-  Image,
-  Pressable,
-  BackHandler,
   Alert,
-} from "react-native";
-import { Image as RNImage } from "react-native";
-import { SafeAreaProvider, useSafeAreaInsets, SafeAreaView } from "react-native-safe-area-context";
+  Image,
+  TouchableHighlight,
+  BackHandler,
+} from 'react-native';
+import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
+import { Image as RNImage } from 'react-native';
 
-import MessageList from "./components/MessageList";
-import { createTextMessage, createImageMessage } from "./utils/MessageUtils";
+import MessageList from './components/MessageList';
+import {
+  createTextMessage,
+  createImageMessage,
+} from './utils/MessageUtils';
 
-const BG = "#F6F7FB"; // <- soft off-white
+class ChatApp extends React.Component {
+  // --- Handout-style state (messages + fullscreenImageId) ---
+  constructor(props) {
+    super(props);
+    const memeUri = RNImage.resolveAssetSource(require('./assets/meme.jpg')).uri;
+    this.state = {
+      messages: [
+        // order like your Android screenshot: Hello, World, then image
+        createTextMessage('Hello'),
+        createTextMessage('World'),
+        createImageMessage(memeUri),
+      ],
+      fullscreenImageId: null,
+    };
+  }
 
-function ChatScreen() {
-  const insets = useSafeAreaInsets();
-  const memeUri = RNImage.resolveAssetSource(require("./assets/meme.jpg")).uri;
+  // --- Handout: dismiss helper ---
+  dismissFullscreenImage = () => {
+    this.setState({ fullscreenImageId: null });
+  };
 
-  const [messages, setMessages] = useState([
-    createTextMessage("Hello"),
-    createTextMessage("World"),
-    createImageMessage(memeUri),
-  ]);
-
-  const [fullscreenUri, setFullscreenUri] = useState(null);
-
-  const onPressMessage = (message) => {
-    if (message.type === "text") {
+  // --- Handout: press handler for list items ---
+  handlePressMessage = (message) => {
+    if (message.type === 'text') {
       Alert.alert(
-        "Delete message?",
+        'Delete message?',
         `"${message.text}"`,
         [
-          { text: "Cancel", style: "cancel" },
+          { text: 'Cancel', style: 'cancel' },
           {
-            text: "Delete",
-            style: "destructive",
+            text: 'Delete',
+            style: 'destructive',
             onPress: () =>
-              setMessages((prev) => prev.filter((m) => m.id !== message.id)),
+              this.setState((prev) => ({
+                messages: prev.messages.filter((m) => m.id !== message.id),
+              })),
           },
         ],
         { cancelable: true }
       );
-    } else if (message.type === "image") {
-      setFullscreenUri(message.uri);
+    } else if (message.type === 'image') {
+      this.setState({ fullscreenImageId: message.id });
     }
   };
 
-  useEffect(() => {
-    const onBack = () => {
-      if (fullscreenUri) {
-        setFullscreenUri(null);
-        return true;
-      }
-      return false;
-    };
-    const sub = BackHandler.addEventListener("hardwareBackPress", onBack);
-    return () => sub.remove();
-  }, [fullscreenUri]);
+  // --- Handout: renderFullscreenImage helper (uses TouchableHighlight overlay) ---
+  renderFullscreenImage = () => {
+    const { messages, fullscreenImageId } = this.state;
+    if (!fullscreenImageId) return null;
 
-  return (
-    <SafeAreaView style={[styles.safe, { backgroundColor: BG }]} edges={["top", "left", "right"]}>
-      <View style={[styles.container, { paddingTop: insets.top ? 4 : 12 }]}>
-        <MessageList messages={messages} onPressMessage={onPressMessage} />
-      </View>
+    const image = messages.find((m) => m.id === fullscreenImageId);
+    if (!image) return null;
 
-      <Modal
-        visible={!!fullscreenUri}
-        animationType="fade"
-        transparent
-        onRequestClose={() => setFullscreenUri(null)}
+    const { uri } = image;
+    return (
+      <TouchableHighlight
+        style={styles.fullscreenOverlay}
+        onPress={this.dismissFullscreenImage}
+        underlayColor="#000"
       >
-        <Pressable style={styles.overlay} onPress={() => setFullscreenUri(null)}>
-          {fullscreenUri && (
-            <Image
-              source={{ uri: fullscreenUri }}
-              style={styles.fullImage}
-              resizeMode="contain"
-            />
-          )}
-        </Pressable>
-      </Modal>
-    </SafeAreaView>
-  );
+        <Image style={styles.fullscreenImage} source={{ uri }} resizeMode="contain" />
+      </TouchableHighlight>
+    );
+  };
+
+  // --- Handout: BackHandler (use componentDidMount / componentWillUnmount) ---
+  componentDidMount() {
+    this.subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+      const { fullscreenImageId } = this.state;
+      if (fullscreenImageId) {
+        this.dismissFullscreenImage();
+        return true; // handled
+      }
+      return false;   // let system handle
+    });
+  }
+
+  componentWillUnmount() {
+    this.subscription && this.subscription.remove();
+  }
+
+  // --- Handout: renderMessageList wrapper ---
+  renderMessageList() {
+    const { messages } = this.state;
+    return (
+      <View style={styles.content}>
+        <MessageList messages={messages} onPressMessage={this.handlePressMessage} />
+      </View>
+    );
+  }
+
+  // --- Handout: render (container + renderMessageList + renderFullscreenImage) ---
+  render() {
+    return (
+      <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
+        <View style={styles.container}>
+          {this.renderMessageList()}
+          {this.renderFullscreenImage()}
+        </View>
+      </SafeAreaView>
+    );
+  }
 }
 
 export default function App() {
   return (
     <SafeAreaProvider>
-      <ChatScreen />
+      <ChatApp />
     </SafeAreaProvider>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1 },
+  // off-white background per your preference
+  safe: { flex: 1, backgroundColor: '#efe3cbff' },
   container: { flex: 1 },
-  overlay: {
-    flex: 1,
-    backgroundColor: "#000",
-    justifyContent: "center",
-    alignItems: "center",
+  content: { flex: 1 },
+
+  // fullscreen overlay (matches handout approach)
+  fullscreenOverlay: {
+    position: 'absolute',
+    left: 0, right: 0, top: 0, bottom: 0,
+    backgroundColor: 'black',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  fullImage: { width: "100%", height: "100%" },
+  fullscreenImage: {
+    width: '100%',
+    height: '100%',
+  },
 });
